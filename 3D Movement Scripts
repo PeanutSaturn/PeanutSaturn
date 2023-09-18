@@ -1,0 +1,695 @@
+// the single worst, least organised and hardest to read code ive made //
+
+
+
+using System;
+using System.Collections;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+public class movem : MonoBehaviour
+{
+  
+//Assingables
+public Transform playerCam;
+
+
+
+    public Transform orientation;
+  
+  public Animator transition;
+
+   
+public static bool Onoff;
+
+private Shake shake;
+
+//PlayerBody
+
+public GameObject Body;
+
+ [SerializeField] private GameObject plsyrt;
+
+
+  public float transitionTIME = 200f;
+
+
+  public static float health = 100;    
+  public float helth = 100;
+  
+  //Other
+    private Rigidbody rb;
+
+    //Rotation and look
+    private float xRotation;
+
+
+    public AudioSource Slide;
+    
+     public static float sensitivity = 90f;
+     float sensMultiplier = 1.5f;
+
+    //Movement
+    public float moveSpeed = 0;
+    public float maxSpee = 0;
+//Speed
+public bool SecretRoom = false;
+
+    public static float walkSpeed = 4000;
+    public static float sprintSpeed = 6000;
+    public static float walkMax = 10;
+    public static float sprintMax = 20;
+
+    public static int Victor = 0;
+    public bool grounded;
+    public LayerMask whatIsGround;
+    public bool gameIsPaused = false;
+
+public static bool AutoSprint;
+
+public float wins;
+    public float counterMovementInAir = 0.2f;
+    private float thresholdInAir = 0.01f;
+    public float counterMovement = 0.4f;
+    private float threshold = 0.01f;
+
+    public float maxSlopeAngle = 35f;
+
+    //Crouch & Slide
+    private Vector3 crouchScale = new Vector3(1, 0.5f, 1);
+    private Vector3 playerScale;
+    public float slideForce = 600;
+    public float slideCounterMovement = 0.05f;
+
+    //Jumping
+public static bool Floortouch = true;
+    public bool readyToJump = true;
+    private float jumpCooldown = 0.25f;
+    public float jumpForce = 550f;
+
+    public int DeathCount;
+//State
+ 
+
+
+
+    //Input
+    float x, y;
+    public static bool jumping, sprinting, crouching, Climbing;
+
+    //Sliding
+    private Vector3 normalVector = Vector3.up;
+    private Vector3 wallNormalVector;
+
+    // Particle Systems
+
+   [SerializeField] private GameObject JumpPartic;
+
+      public AudioSource Jumps;
+
+
+       public AudioSource Jum;
+
+   public bool Particl;
+
+void Die()
+{
+   DeathCount = PlayerPrefs.GetInt ("DeathCount");
+DeathCount ++;
+     PlayerPrefs.SetInt("DeathCount", DeathCount);
+
+
+BulletDamage.DamageFB = 2;
+BulletDamage15.DamageMB = 15;
+BulletDamage50.DamageSB = 55;
+
+            EnemyAI.Halt = 60;
+movem.Victor = 0;
+if (SecretRoom == false){
+ StartCoroutine(HEHEHEH(SceneManager.GetActiveScene().buildIndex + 1));
+
+}else{
+
+    StartCoroutine(Secret(SceneManager.GetActiveScene().buildIndex + 1));
+}
+}
+
+
+
+
+
+    void Awake()
+    {
+        rb = GetComponent<Rigidbody>();
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+    }
+
+    private void Start()
+    {
+
+
+
+
+
+if (ShopMenuCenter.StimBuy == true){
+    walkSpeed = 6000;
+    sprintSpeed = 9000;
+    walkMax = 15;
+    sprintMax = 25;
+}
+
+
+
+
+
+
+if (ShopMenuCenter.PillBuy == true){
+
+
+    Heal();
+}
+
+        if (OPTIONSMENU.HPguy == false){
+        health = 100;
+        
+
+
+        }else{
+
+            health = 1;
+        }
+
+
+        shake = GameObject.FindGameObjectWithTag("ScreenShake").GetComponent<Shake>();
+    
+        
+        sensMultiplier = 2f;
+        
+        playerScale = transform.localScale;
+    Invoke ("Begin", 1);
+       
+    }
+
+
+public void Begin(){
+ Cursor. lockState = CursorLockMode. Locked;
+        Cursor. visible = false;
+}
+
+
+
+
+  void OnTriggerEnter(Collider collider)
+    {
+        if(collider.gameObject == plsyrt)
+        {
+health -= 15;
+helth -= 15;
+shake.CamShake();
+        }
+    }
+
+
+
+public void ResumingTheGameButton(){
+    
+        gameIsPaused = false;
+}
+
+    private void FixedUpdate()
+    {
+Floortouch = grounded;
+
+
+
+
+  
+Movement();
+
+
+wins = Victor;
+
+
+if (health <= 0){
+    Die();
+}
+    
+    }
+
+
+    
+
+    private void Update()
+{
+MyInput();
+        Look();
+GroundHit();
+
+if (AutoSprint == true)
+  {
+            moveSpeed = sprintSpeed;
+            maxSpee = sprintMax;
+        }
+if (helth < 0)
+{
+    Die();
+}
+
+    
+           if (Input.GetKeyUp(KeyCode.Escape))
+        {
+            if (gameIsPaused)
+            {
+                Resume();
+            }
+            else
+            {
+                Pause();
+            }
+        }
+      
+       
+    
+
+    
+      
+    }
+    /// <summary>
+    /// Find user input. Should put this in its own class but im lazy
+    /// </summary>
+    private void MyInput()
+    {
+        x = Input.GetAxisRaw("Horizontal");
+        y = Input.GetAxisRaw("Vertical");
+        jumping = Input.GetButton("Jump");
+        crouching = Input.GetKey(KeyCode.LeftControl);
+        
+        //Crouching
+        if (Input.GetKeyDown(KeyCode.LeftControl))
+            StartCrouch();
+        if (Input.GetKeyUp(KeyCode.LeftControl))
+            StopCrouch();
+    }
+
+    private void StartCrouch()
+    {
+        if (grounded == true)
+        {
+            Slide.Play();
+        }
+       Body.transform.localScale = crouchScale;
+        Body.transform.position = new Vector3(transform.position.x, transform.position.y - 0.5f, transform.position.z);
+        if (rb.velocity.magnitude > 0.5f)
+        {
+            if (grounded)
+            {
+                rb.AddForce(orientation.transform.forward * slideForce);
+            }
+          
+        }
+    }
+   
+    void Resume()
+    {
+  
+       
+        gameIsPaused = false;
+    }
+    void Pause()
+    {
+        
+        
+        gameIsPaused = true;
+    }
+    private void StopCrouch()
+    {
+         Slide.Stop();
+         Body.transform.localScale = playerScale;
+         Body.transform.position = new Vector3(transform.position.x, transform.position.y + 0.5f, transform.position.z);
+    }
+   
+//ADDITIONS
+
+
+//SlowHealing
+
+public void Heal(){
+
+StartCoroutine(SlowRegen());
+
+}
+
+
+
+
+
+
+ IEnumerator SlowRegen(){
+    if (health <= 100 && health >= 1){
+health += 2;
+ yield return new WaitForSeconds(2);
+
+ Heal();
+    }else{
+
+yield return new WaitForSeconds(2);
+
+ Heal();
+    }
+ }
+
+
+
+//Speed For Stim
+
+
+
+
+ 
+
+
+
+
+
+    private void Movement()
+        
+    {
+        //Extra gravity
+        rb.AddForce(Vector3.down * Time.deltaTime * 10);
+
+        //Find actual velocity relative to where player is looking
+        Vector2 mag = FindVelRelativeToLook();
+        float xMag = mag.x, yMag = mag.y;
+
+        //Counteract sliding and sloppy movement
+        CounterMovement(x, y, mag);
+        CounterMovementInAir(x, y, mag);
+        //If holding jump && ready to jump, then jump
+
+        float maxSpeed = this.maxSpee;
+
+        if (readyToJump && jumping) Jump();
+    
+        //Set max speed
+        if (Input.GetKey(KeyCode.LeftShift))
+            
+            {
+            moveSpeed = sprintSpeed;
+            maxSpee = sprintMax;
+        }
+            else
+        {
+            if (AutoSprint == false)
+  {
+            moveSpeed = walkSpeed;
+            maxSpee = walkMax;
+        }
+        }
+
+      if (Climbing == true)
+{
+   if (Input.GetKey("w"))
+    {
+rb.AddForce(Vector3.up * Time.deltaTime * 3000);
+
+   if (Mathf.Sqrt((Mathf.Pow(rb.velocity.y, 2))) > 50)
+        {
+            float fallspeed = rb.velocity.y;
+            Vector3 n = rb.velocity.normalized * maxSpee;
+            rb.velocity = new Vector3(n.x, fallspeed, n.z);
+        }
+
+    }
+}
+        //If sliding down a ramp, add force down so player stays grounded and also builds speed
+        if (crouching && grounded && readyToJump)
+        {
+            rb.AddForce(Vector3.down * Time.deltaTime * 3000);
+            return;
+        }
+
+        //If speed is larger than maxspeed, cancel out the input so you don't go over max speed
+        if (x > 0 && xMag > maxSpeed) x = 0;
+        if (x < 0 && xMag < -maxSpeed) x = 0;
+        if (y > 0 && yMag > maxSpeed) y = 0;
+        if (y < 0 && yMag < -maxSpeed) y = 0;
+
+        //Some multipliers
+        float multiplier = 1f, multiplierV = 1f;
+
+        // Movement in air
+        if (!grounded)
+        {
+            multiplier = 0.5f;
+            multiplierV = 0.5f;
+        }
+
+        // Movement while sliding
+        if (grounded && crouching) multiplierV = 1f;
+
+        //Apply forces to move player
+        rb.AddForce(orientation.transform.forward * y * moveSpeed * Time.deltaTime * multiplier * multiplierV);
+        rb.AddForce(orientation.transform.right * x * moveSpeed * Time.deltaTime * multiplier);
+
+
+
+        // Movement while sliding
+
+            }
+
+    private void Jump()
+    {
+        if (grounded && readyToJump)
+           
+        {
+
+           
+            readyToJump = false;
+Jum.Play();
+            //Add jump forces
+            rb.AddForce(Vector2.up * jumpForce * 1.5f);
+            rb.AddForce(normalVector * jumpForce * 0.5f);
+
+            //If jumping while falling, reset y velocity.
+            Vector3 vel = rb.velocity;
+            if (rb.velocity.y < 0.5f)
+                rb.velocity = new Vector3(vel.x, 0, vel.z);
+            else if (rb.velocity.y > 0)
+                rb.velocity = new Vector3(vel.x, vel.y / 2, vel.z);
+
+            Invoke(nameof(ResetJump), jumpCooldown);
+        }
+    }
+
+    private void ResetJump()
+    {
+         Particl = true;
+        readyToJump = true;
+
+
+    }
+
+    private float desiredX;
+
+   
+
+        
+   
+    private void Look()
+    {
+       if (gameIsPaused == false){
+        float mouseX = Input.GetAxis("Mouse X") * sensitivity * Time.fixedDeltaTime * sensMultiplier;
+        float mouseY = Input.GetAxis("Mouse Y") * sensitivity * Time.fixedDeltaTime * sensMultiplier;
+
+        //Find current look rotation
+        Vector3 rot = playerCam.transform.localRotation.eulerAngles;
+
+         
+
+        desiredX = rot.y + mouseX;
+
+        //Rotate, and also make sure we dont over- or under-rotate.
+        xRotation -= mouseY;
+        xRotation = Mathf.Clamp(xRotation, -90f, 90f);
+
+        //Perform the rotations
+        playerCam.transform.localRotation = Quaternion.Euler(xRotation, desiredX, 0);
+
+         
+        orientation.transform.localRotation = Quaternion.Euler(0, desiredX, 0);
+         
+    }
+    }
+    public void SensStored (float sensIndex) {
+
+        sensitivity = sensIndex;
+
+     }
+    private void CounterMovement(float x, float y, Vector2 mag)
+    {
+        if (!grounded || jumping ) return;
+
+
+        //Slow down sliding
+        if (crouching)
+        {
+            rb.AddForce(moveSpeed * Time.deltaTime * -rb.velocity.normalized * slideCounterMovement);
+            return;
+        }
+
+        //Counter movement
+        if (Math.Abs(mag.x) > threshold && Math.Abs(x) < 0.05f || (mag.x < -threshold && x > 0) || (mag.x > threshold && x < 0))
+        {
+            rb.AddForce(moveSpeed * orientation.transform.right * Time.deltaTime * -mag.x * counterMovement);
+        }
+        if (Math.Abs(mag.y) > threshold && Math.Abs(y) < 0.05f || (mag.y < -threshold && y > 0) || (mag.y > threshold && y < 0))
+        {
+            rb.AddForce(moveSpeed * orientation.transform.forward * Time.deltaTime * -mag.y * counterMovement);
+        }
+
+        //Limit diagonal running. This will also cause a full stop if sliding fast and un-crouching, so not optimal.
+        if (Mathf.Sqrt((Mathf.Pow(rb.velocity.x, 2) + Mathf.Pow(rb.velocity.z, 2))) > maxSpee)
+        {
+            float fallspeed = rb.velocity.y;
+            Vector3 n = rb.velocity.normalized * maxSpee;
+            rb.velocity = new Vector3(n.x, fallspeed, n.z);
+        }
+     
+    }
+
+
+
+
+   private void CounterMovementInAir(float x, float y, Vector2 mag)
+    {
+        if (grounded || jumping) return;
+
+        //Slow down sliding
+        if (crouching)
+        {
+            rb.AddForce(moveSpeed * Time.deltaTime * -rb.velocity.normalized * slideCounterMovement);
+            return;
+        }
+
+        //Counter movement In Air
+        if (Math.Abs(mag.x) > thresholdInAir && Math.Abs(x) < 0.05f || (mag.x < -thresholdInAir && x > 0) || (mag.x > thresholdInAir && x < 0))
+        {
+            rb.AddForce(moveSpeed * orientation.transform.right * Time.deltaTime * -mag.x * counterMovementInAir);
+        }
+        if (Math.Abs(mag.y) > thresholdInAir && Math.Abs(y) < 0.05f || (mag.y < -thresholdInAir && y > 0) || (mag.y > thresholdInAir && y < 0))
+        {
+            rb.AddForce(moveSpeed * orientation.transform.forward * Time.deltaTime * -mag.y * counterMovementInAir);
+        }
+
+        //Limit diagonal running. This will also cause a full stop if sliding fast and un-crouching, so not optimal.
+      
+    }
+
+
+
+    /// <summary>
+    /// Find the velocity relative to where the player is looking
+    /// Useful for vectors calculations regarding movement and limiting movement
+    /// </summary>
+    /// <returns></returns>
+    public Vector2 FindVelRelativeToLook()
+    {
+        float lookAngle = orientation.transform.eulerAngles.y;
+        float moveAngle = Mathf.Atan2(rb.velocity.x, rb.velocity.z) * Mathf.Rad2Deg;
+
+        float u = Mathf.DeltaAngle(lookAngle, moveAngle);
+        float v = 90 - u;
+
+        float magnitue = rb.velocity.magnitude;
+        float yMag = magnitue * Mathf.Cos(u * Mathf.Deg2Rad);
+        float xMag = magnitue * Mathf.Cos(v * Mathf.Deg2Rad);
+
+        return new Vector2(xMag, yMag);
+    }
+
+    private bool IsFloor(Vector3 v)
+    {
+        float angle = Vector3.Angle(Vector3.up, v);
+        return angle < maxSlopeAngle;
+    }
+     private bool IsFloore(Vector3 v)
+    {
+        float angle = Vector3.Angle(Vector3.up, v);
+        return angle < maxSlopeAngle;
+    }
+    private bool cancellinginteractable;
+    private bool cancellingGrounded;
+
+    /// <summary>
+    /// Handle ground detection
+    /// </summary>
+   
+
+    private void OnCollisionStay(Collision other)
+    {
+        //Make sure we are only checking for walkable layers
+        int layer = other.gameObject.layer;
+        if (whatIsGround != (whatIsGround | (1 << layer))) return;
+
+        //Iterate through every collision in a physics update
+        for (int i = 0; i < other.contactCount; i++)
+        {
+            Vector3 normal = other.contacts[i].normal;
+            //FLOOR
+            if (IsFloor(normal))
+            {
+
+
+                grounded = true;
+                cancellingGrounded = false;
+                normalVector = normal;
+                CancelInvoke(nameof(StopGrounded));
+               
+            }
+        }
+
+        //Invoke ground/wall cancel, since we can't check normals with CollisionExit
+        float delay = 3f;
+        if (!cancellingGrounded)
+        {
+            cancellingGrounded = true;
+            Invoke(nameof(StopGrounded), Time.deltaTime * delay);
+
+        }
+
+    }
+
+
+void GroundHit()
+{
+
+    if (Particl == true && grounded == true)
+{
+    Particl = false;
+        
+GameObject ps = (GameObject)Instantiate(JumpPartic, transform.position, Quaternion.identity);
+Destroy(ps, 1f);
+        Jumps.Play();
+}
+}
+    private void StopGrounded()
+    {
+        grounded = false;
+    }
+    IEnumerator HEHEHEH(int levelInx){
+ transition.SetTrigger("Leaving");
+ yield return new WaitForSeconds(2);
+SceneManager.LoadScene("DeathScene");
+}
+
+
+  IEnumerator Secret(int levelInx){
+ transition.SetTrigger("Leaving");
+ yield return new WaitForSeconds(2);
+SceneManager.LoadScene("HappyRoom");
+}
+
+}
+
+
+
